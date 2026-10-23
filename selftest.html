@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8" /><title>识字自检（开发用）</title></head>
+<body><pre id="out">running</pre><div id="app"></div><script type="module">
+// 1. 用 samples/ 里的截图跑真实识别模型，打印分段结果
+// 2. 把主界面挂到页面上（不是预览模式），模拟按 Ctrl+V 粘贴一张截图，检查界面走完识别流程
+import { recognize } from '/src/tool/ocr.ts';
+import { lineBoxes, toParagraphs } from '/src/tool/core.ts';
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { Main } from '/src/tool/Main.tsx';
+import '/src/kit/kit.css';
+const res = [];
+let pasteBytes = null;
+for (const name of ['示例-英文软件提示.png', '示例-中文通知.png']) {
+  const resp = await fetch('/samples/' + encodeURIComponent(name));
+  if (!resp.ok) { res.push(`${name}：跳过（没有 samples/）`); continue; }
+  const bytes = new Uint8Array(await resp.arrayBuffer());
+  pasteBytes ??= bytes;
+  const t0 = performance.now();
+  const r = await recognize(bytes, { useCls: false, minScore: 0.5 });
+  res.push(`${name}：${r.lines.length} 行，耗时 ${Math.round(performance.now() - t0)}ms`);
+  for (const l of r.lines) res.push(`  行  ${l.text}  (${l.score.toFixed(3)})`);
+  for (const p of toParagraphs(lineBoxes(r.lines))) res.push(`  段  ${p}`);
+}
+try { await recognize(new Uint8Array([1, 2, 3]), { useCls: false, minScore: 0.5 }); res.push('损坏图片：没有报错'); } catch (e) { res.push('损坏图片：' + e.message); }
+document.documentElement.dataset.layout = 'e'; document.documentElement.dataset.palette = 'green'; document.documentElement.dataset.mode = 'light';
+const ctx = { readFile: async () => new Uint8Array(), readText: async () => '', writeFile: async () => {}, writeText: async () => {}, mkdir: async () => {}, join: async (...p) => p.join('/'), llm: async () => '{}', sidecar: async () => '' };
+createRoot(document.getElementById('app')).render(React.createElement(Main, { ctx, preview: false }));
+await new Promise((r) => setTimeout(r, 300));
+const dt = new DataTransfer();
+dt.items.add(new File([pasteBytes], 'image.png', { type: 'image/png' }));
+document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+for (let i = 0; i < 100 && !document.querySelector('.st-pair'); i++) await new Promise((r) => setTimeout(r, 100));
+res.push('粘贴后界面：' + [...document.querySelectorAll('.st-src')].map((e) => e.textContent).join(' | '));
+res.push('文件名：' + (document.querySelector('.st-shot-info b')?.textContent ?? '无'));
+document.getElementById('out').textContent = res.join('\n');
+</script></body></html>

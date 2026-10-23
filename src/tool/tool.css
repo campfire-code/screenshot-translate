@@ -1,0 +1,42 @@
+/* 截图识字翻译：只用 kit.css 的变量。类名统一以 st- 开头。 */
+.st-root { display: flex; flex-direction: column; gap: 14px; }
+.st-sp { flex: 1; }
+.st-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.st-end { justify-content: flex-end; }
+
+.st-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 230px; padding: 24px; text-align: center; color: var(--ink); background: var(--surface); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-lg); cursor: pointer; font: inherit; transition: border-color .15s var(--ease), background .15s var(--ease); }
+.st-drop svg { color: var(--primary); }
+.st-drop b { font-size: 1.08em; font-weight: 600; }
+.st-drop:hover, .st-drop.hover { border-color: var(--primary); background: var(--primary-soft); }
+kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 5px; font: inherit; font-size: .9em; background: var(--chip); }
+
+.st-shot { display: flex; gap: 14px; padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.st-shot.hover { border-color: var(--primary); }
+.st-shot img { flex: none; width: 200px; max-height: 140px; object-fit: contain; object-position: left top; border-radius: 6px; background: var(--chip); }
+.st-shot-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.st-shot-info b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-paste { display: inline-flex; align-items: center; gap: 4px; font-size: .9em; }
+
+.st-bar { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.st-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.st-field select { min-width: 230px; }
+
+.st-busy { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.st-busy .k-bar { flex: 1; max-width: 220px; }
+
+.st-panel { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+.st-panel-hd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.st-panel-hd .k-muted { font-size: .9em; }
+.st-small { height: 28px; padding: 0 10px; }
+.st-edit { margin: 12px 14px; width: auto; border-radius: min(var(--radius), 10px); line-height: 1.7; }
+.st-panel > .st-end { padding: 0 14px 12px; }
+
+.st-pairs { list-style: none; margin: 0; padding: 0; }
+.st-pair { position: relative; padding: 12px 48px 12px 14px; border-bottom: 1px solid var(--line); user-select: text; }
+.st-pair:last-child { border-bottom: 0; }
+.st-pair p { margin: 0; line-height: 1.65; overflow-wrap: anywhere; white-space: pre-wrap; }
+.st-src { color: var(--muted); font-size: .93em; }
+.st-dst { margin-top: 4px !important; color: var(--ink); font-size: 1.04em; }
+.st-pair-copy { position: absolute; top: 8px; right: 8px; opacity: .55; transition: opacity .15s var(--ease); }
+.st-pair:hover .st-pair-copy, .st-pair-copy:focus-within { opacity: 1; }
+.st-copy { padding: 10px 14px; border-top: 1px solid var(--line); background: var(--side); }

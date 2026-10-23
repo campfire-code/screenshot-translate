@@ -1,0 +1,13 @@
+{
+  "id": "o21",
+  "slug": "screenshot-translate",
+  "name": "截图识字翻译",
+  "version": "0.1.0",
+  "repo": "campfire-code/screenshot-translate",
+  "license": "MIT",
+  "ui": {
+    "layout": "e",
+    "palette": "green"
+  },
+  "upstream": null
+}
