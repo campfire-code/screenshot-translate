@@ -121,6 +121,7 @@ export function buildMessages(segs: string[], target: string): Msg[] {
   return [
     {
       role: 'system',
+      // check-zh: 忽略（写给大模型的提示词里的 JSON 字段名）
       content: `你是专业翻译。把用户给的截图文字逐段翻译成${lang}。
 要求：
 1. 输入是 JSON：{"segments": [...]}，每个元素是一段原文（来自截图识别，可能有个别错字，按上下文理解）。

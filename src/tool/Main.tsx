@@ -8,6 +8,7 @@ import { llmReady, useSettings } from '../kit/settings';
 import { AUTO, IMAGE_EXTS, LANGS, copyText, isImagePath, joinSource, langLabel, lineBoxes, pastedName, resolveTarget, splitSource, toParagraphs, translate, type Pair } from './core';
 import type { TextLine } from './ocr-core';
 import { SAMPLE_NAME, SAMPLE_SEGMENTS, SAMPLE_TRANSLATIONS, sampleImage } from './sample';
+import { EmptyFlow } from './Empty';
 import './tool.css';
 
 type Ctx = Parameters<CustomTool['Main']>[0]['ctx'];
@@ -49,7 +50,7 @@ export function Main({ ctx, preview }: { ctx?: Ctx; preview?: boolean }) {
 
   // 预览页：直接展示示例截图和结果
   useEffect(() => {
-    if (!preview) return;
+    if (!preview || new URLSearchParams(location.search).get('state') === 'empty') return;
     setShot({ name: SAMPLE_NAME, url: sampleImage(), width: 900, height: 420 });
     setEdited(SAMPLE_SEGMENTS);
     setResult({ key: SAMPLE_SEGMENTS.join('\u0000') + '|zh-Hans', lang: 'zh-Hans', texts: SAMPLE_TRANSLATIONS });
@@ -131,103 +132,116 @@ export function Main({ ctx, preview }: { ctx?: Ctx; preview?: boolean }) {
   };
   const changeMode = (v: boolean) => { setByLine(v); savePref({ byLine: v }); setEdited(null); };
 
+  const sourceName = shot?.name ?? '';
   return (
     <div className="st-root">
+      <header className="st-head">
+        <h1>截图识字翻译</h1>
+        <p className="k-muted">截图贴进来，本机认字，大模型翻译，译文大字显示、原文留在下面核对</p>
+      </header>
       {!shot ? (
         <button className={`st-drop${hover ? ' hover' : ''}`} onClick={pick}>
-          <ImagePlus size={28} />
-          <b>把截图拖到这里，或按 <kbd>{navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl'}</kbd> + <kbd>V</kbd> 粘贴</b>
-          <span className="k-muted">也可以点击选择图片 · 支持 PNG、JPG、WebP、BMP、GIF</span>
+          <EmptyFlow />
+          <b>{hover ? '松开鼠标，开始识别' : <>把截图拖到这里，或按 <kbd>{navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl'}</kbd> + <kbd>V</kbd> 粘贴</>}</b>
+          <span className="k-muted"><ImagePlus size={14} />也可以点击选择图片 · 支持 PNG、JPG、WebP、BMP、GIF</span>
           <span className="k-muted">文字识别在本机完成；翻译会把识别出的文字发给你在「设置」里填的大模型</span>
         </button>
       ) : (
-        <div className={`st-shot${hover ? ' hover' : ''}`}>
-          <img src={shot.url} alt={`截图：${shot.name}`} />
-          <div className="st-shot-info">
-            <b title={shot.name}>{shot.name}</b>
-            <span className="k-muted k-num">{shot.width ? `${shot.width}×${shot.height} · ` : ''}{lines || edited ? `${segs.length} ${byLine ? '行' : '段'}文字` : '识别中…'}</span>
-            <span className="st-sp" />
+        <div className="st-work">
+          <aside className="st-left">
+            <figure className={`st-shot${hover ? ' hover' : ''}`}>
+              <img src={shot.url} alt={`截图：${sourceName}`} />
+              <figcaption>
+                <b title={sourceName}>{sourceName}</b>
+                <span className="k-muted k-num">{shot.width ? `${shot.width}×${shot.height} · ` : ''}{lines || edited ? `${segs.length} ${byLine ? '行' : '段'}文字` : '识别中…'}</span>
+              </figcaption>
+            </figure>
             <div className="st-row">
               <button className="k-btn" onClick={pick} disabled={busy}><ImagePlus size={15} />换一张</button>
               <span className="k-muted st-paste"><ClipboardPaste size={14} />或直接粘贴</span>
             </div>
-          </div>
-        </div>
-      )}
+            <div className="st-ctl">
+              <label className="st-field">
+                <span className="k-label">翻译成</span>
+                <select className="k-input" value={target} disabled={busy} onChange={(e) => changeTarget(e.target.value)}>
+                  <option value={AUTO}>自动（中文译英，其余译中）</option>
+                  {LANGS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              </label>
+              <div className="st-field">
+                <span className="k-label">分段</span>
+                <div className="k-seg" role="radiogroup" aria-label="分段">
+                  <button role="radio" aria-checked={!byLine} className={!byLine ? 'on' : ''} disabled={busy} onClick={() => changeMode(false)}>接成段落</button>
+                  <button role="radio" aria-checked={byLine} className={byLine ? 'on' : ''} disabled={busy} onClick={() => changeMode(true)}>按原行</button>
+                </div>
+              </div>
+              <button className="k-btn primary st-go" disabled={busy || !segs.length || !ready} title={!ready ? '先到「设置」里填写大模型' : undefined} onClick={() => runTranslate(segs, lang)}>
+                {status === 'translating' ? <Loader2 size={15} className="k-spin" /> : fresh ? <RefreshCw size={15} /> : <Languages size={15} />}
+                {fresh ? '重新翻译' : '翻译'}
+              </button>
+            </div>
+          </aside>
 
-      <div className="st-bar">
-        <label className="st-field">
-          <span className="k-label">翻译成</span>
-          <select className="k-input" value={target} disabled={busy} onChange={(e) => changeTarget(e.target.value)}>
-            <option value={AUTO}>自动（中文→英语，其他→简体中文）</option>
-            {LANGS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-          </select>
-        </label>
-        <div className="st-field">
-          <span className="k-label">分段</span>
-          <div className="k-seg" role="radiogroup" aria-label="分段">
-            <button role="radio" aria-checked={!byLine} className={!byLine ? 'on' : ''} disabled={busy} onClick={() => changeMode(false)}>接成段落</button>
-            <button role="radio" aria-checked={byLine} className={byLine ? 'on' : ''} disabled={busy} onClick={() => changeMode(true)}>按原行</button>
-          </div>
-        </div>
-        <span className="st-sp" />
-        <button className="k-btn primary" disabled={busy || !segs.length || !ready} title={!ready ? '先到「设置」里填写大模型' : undefined} onClick={() => runTranslate(segs, lang)}>
-          {status === 'translating' ? <Loader2 size={15} className="k-spin" /> : fresh ? <RefreshCw size={15} /> : <Languages size={15} />}
-          {fresh ? '重新翻译' : '翻译'}
-        </button>
-      </div>
+          <section className="st-right">
+            {busy && (
+              <div className="st-busy" role="status">
+                <Loader2 size={15} className="k-spin" />
+                <span>{status === 'ocr' ? '正在识别文字…（第一次会多花几秒加载模型）' : `正在翻译成${langLabel(lang)}…`}</span>
+                <ProgressBar ratio={progress} label={status === 'ocr' ? '识别进度' : '翻译进度'} />
+              </div>
+            )}
+            {status === 'error' && error && (
+              <div className="k-notice err" role="alert"><span>{error}</span><button className="k-icon-btn" aria-label="关闭提示" onClick={() => { setError(''); setStatus(segs.length ? 'done' : 'idle'); }}><X size={14} /></button></div>
+            )}
+            {!ready && segs.length > 0 && !preview && (
+              <div className="k-notice" role="status"><span>文字已识别。要翻译，请先到「设置」填写大模型的接口地址、密钥和模型名。</span></div>
+            )}
+            {pasteHint && <div className="k-notice" role="status"><span>剪贴板里没有图片。先截图到剪贴板（或在图片上右键「复制图片」），再按粘贴。</span></div>}
+            {(lines || edited) && !segs.length && status === 'done' && <div className="k-notice"><span>这张图里没有识别到文字。图片太小或文字太浅时，可以放大后重新截图。</span></div>}
 
-      {busy && (
-        <div className="st-busy" role="status">
-          <Loader2 size={15} className="k-spin" />
-          <span>{status === 'ocr' ? '正在识别文字…（第一次会多花几秒加载模型）' : `正在翻译成${langLabel(lang)}…`}</span>
-          <ProgressBar ratio={progress} label={status === 'ocr' ? '识别进度' : '翻译进度'} />
+            {editing !== null ? (
+              <section className="st-panel">
+                <div className="st-panel-hd"><b>修改原文</b><span className="k-muted">{byLine ? '每行一段' : '段与段之间空一行'}，识别错的字可以在这里改</span></div>
+                <textarea className="k-input k-textarea st-edit" rows={10} value={editing} onChange={(e) => setEditing(e.target.value)} aria-label="原文" />
+                <div className="st-row st-end">
+                  <button className="k-btn" onClick={() => setEditing(null)}>取消</button>
+                  <button className="k-btn primary" onClick={() => {
+                    const list = splitSource(editing, byLine);
+                    setEdited(list); setEditing(null);
+                    if (ready && list.length) void runTranslate(list, resolveTarget(target, list.join('\n')));
+                  }}>{ready ? '保存并翻译' : '保存'}</button>
+                </div>
+              </section>
+            ) : segs.length > 0 && (
+              <section className="st-panel">
+                <div className="st-panel-hd">
+                  <span className="st-badge">{fresh ? langLabel(result!.lang) : '待翻译'}</span>
+                  <b>译文</b>
+                  <span className="k-muted k-num">{segs.length} {byLine ? '行' : '段'}</span>
+                  <span className="st-sp" />
+                  <button className="k-btn st-small" disabled={busy} onClick={() => setEditing(joinSource(segs, byLine))}><PencilLine size={14} />修改原文</button>
+                </div>
+                <ol className="st-pairs">
+                  {pairs.map((p, i) => (
+                    <li key={i} className="st-pair">
+                      <i className="st-no k-num">{i + 1}</i>
+                      <div className="st-txt">
+                        {p.target ? <p className="st-dst">{p.target}</p> : <p className="st-dst k-muted">{status === 'translating' ? '翻译中…' : '（未翻译）'}</p>}
+                        <p className="st-src"><span>原文</span>{p.source}</p>
+                      </div>
+                      {p.target && <span className="st-pair-copy"><CopyButton text={p.target} /></span>}
+                    </li>
+                  ))}
+                </ol>
+                <div className="st-row st-copy">
+                  {fresh && <CopyButton text={copyText(pairs, 'target', byLine)} label="复制全部译文" />}
+                  <CopyButton text={copyText(pairs, 'source', byLine)} label="复制原文" />
+                  {fresh && <CopyButton text={copyText(pairs, 'both', byLine)} label="复制对照" />}
+                </div>
+              </section>
+            )}
+          </section>
         </div>
-      )}
-      {status === 'error' && error && (
-        <div className="k-notice err" role="alert"><span>{error}</span><button className="k-icon-btn" aria-label="关闭提示" onClick={() => { setError(''); setStatus(segs.length ? 'done' : 'idle'); }}><X size={14} /></button></div>
-      )}
-      {!ready && segs.length > 0 && !preview && (
-        <div className="k-notice" role="status"><span>文字已识别。要翻译，请先到「设置」填写大模型的接口地址、密钥和模型名。</span></div>
-      )}
-      {pasteHint && <div className="k-notice" role="status"><span>剪贴板里没有图片。先截图到剪贴板（或在图片上右键「复制图片」），再按粘贴。</span></div>}
-      {(lines || edited) && !segs.length && status === 'done' && <div className="k-notice"><span>这张图里没有识别到文字。图片太小或文字太浅时，可以放大后重新截图。</span></div>}
-
-      {editing !== null ? (
-        <section className="st-panel">
-          <div className="st-panel-hd"><b>修改原文</b><span className="k-muted">{byLine ? '每行一段' : '段与段之间空一行'}，识别错的字可以在这里改</span></div>
-          <textarea className="k-input k-textarea st-edit" rows={10} value={editing} onChange={(e) => setEditing(e.target.value)} aria-label="原文" />
-          <div className="st-row st-end">
-            <button className="k-btn" onClick={() => setEditing(null)}>取消</button>
-            <button className="k-btn primary" onClick={() => {
-              const list = splitSource(editing, byLine);
-              setEdited(list); setEditing(null);
-              if (ready && list.length) void runTranslate(list, resolveTarget(target, list.join('\n')));
-            }}>{ready ? '保存并翻译' : '保存'}</button>
-          </div>
-        </section>
-      ) : segs.length > 0 && (
-        <section className="st-panel">
-          <div className="st-panel-hd">
-            <b>原文 / {fresh ? langLabel(result!.lang) : '译文'}</b>
-            <span className="st-sp" />
-            <button className="k-btn st-small" disabled={busy} onClick={() => setEditing(joinSource(segs, byLine))}><PencilLine size={14} />修改原文</button>
-          </div>
-          <ol className="st-pairs">
-            {pairs.map((p, i) => (
-              <li key={i} className="st-pair">
-                <p className="st-src">{p.source}</p>
-                {p.target ? <p className="st-dst">{p.target}</p> : <p className="st-dst k-muted">{status === 'translating' ? '翻译中…' : '（未翻译）'}</p>}
-                {p.target && <span className="st-pair-copy"><CopyButton text={p.target} /></span>}
-              </li>
-            ))}
-          </ol>
-          <div className="st-row st-copy">
-            {fresh && <CopyButton text={copyText(pairs, 'target', byLine)} label="复制全部译文" />}
-            <CopyButton text={copyText(pairs, 'source', byLine)} label="复制原文" />
-            {fresh && <CopyButton text={copyText(pairs, 'both', byLine)} label="复制对照" />}
-          </div>
-        </section>
       )}
     </div>
   );
